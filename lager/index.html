@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Lager">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#14202b">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="style.css">
+<title>Lagererfassung</title>
+</head>
+<body>
+<div id="app">
+  <header id="erfInfo"></header>
+  <div id="expect" class="st-neutral"></div>
+  <div id="msg" hidden></div>
+  <nav id="tabs"></nav>
+
+  <main>
+    <section id="v-erfassen">
+      <div class="card" id="prod"></div>
+      <div class="card">
+        <div id="camWrap" hidden><video id="cam" playsinline muted></video><div class="reticle"></div></div>
+        <button class="btn" id="btnCam">Kamera-Scanner starten</button>
+        <div class="row"><input id="inQty" type="number" inputmode="numeric" min="1" step="1" placeholder="Menge (z. B. 47)"><button class="btn" id="btnQty">Menge +</button></div>
+        <div class="row"><input id="inCode" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Barcode eingeben"><button class="btn" id="btnCode">OK</button></div>
+        <button class="btn" id="btnSearch">Produkt suchen / auswählen</button>
+      </div>
+      <div id="actions">
+        <div class="row big"><button class="btn ok" id="btnConfirm">Bestätigen</button><button class="btn bad" id="btnCancel">Abbruch</button></div>
+        <div class="row three"><button class="btn" id="btnStart">Erfass. Start</button><button class="btn" id="btnPause">Unterbrechen</button><button class="btn" id="btnFinish">Abschließen</button></div>
+      </div>
+      <div class="card"><h3>Letzte 3 bestätigte Positionen</h3><ol id="recent"></ol></div>
+    </section>
+
+    <section id="v-produkte" hidden>
+      <div class="card"><div class="row"><input id="pSearch" type="search" placeholder="Suchen: Name, Barcode, Kategorie, Variante"><button class="btn" id="pNew">Neu</button></div></div>
+      <div class="list" id="pList"></div>
+    </section>
+
+    <section id="v-bestand" hidden>
+      <div class="card"><select id="bSel"></select><input id="bSearch" type="search" placeholder="Suchen: Produktname oder Barcode"></div>
+      <div class="list" id="bList"></div>
+    </section>
+
+    <section id="v-import" hidden>
+      <div class="card">
+        <h3>Produkte aus Excel importieren</h3>
+        <p>XLSX-Datei mit den Spalten <b>Barcode, Produktname, Kategorie, Variante</b> (Reihenfolge egal). Der Import geschieht ganz oder gar nicht.</p>
+        <label class="btn filebtn">Excel-Datei wählen<input type="file" id="fileImp" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></label>
+        <div id="impOut"></div>
+      </div>
+    </section>
+
+    <section id="v-export" hidden>
+      <div class="card"><h3>Excel-Export je Erfassung</h3><p>Jede Erfassung wird als eigene Datei ausgegeben. Speichern über das iOS-Teilen-Menü (z. B. „In Dateien sichern“).</p></div>
+      <div class="list" id="eList"></div>
+    </section>
+
+    <section id="v-mehr" hidden></section>
+  </main>
+</div>
+<div id="modal" hidden></div>
+<script src="lib/zxing.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
