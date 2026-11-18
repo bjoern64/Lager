@@ -1,4 +1,4 @@
-```yaml
+# Veröffentlicht die App automatisch auf GitHub Pages und lädt dabei die Scanner-Bibliothek selbst herunter.
 name: App veröffentlichen
 on:
   push:
@@ -30,4 +30,3 @@ jobs:
           path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
-```
