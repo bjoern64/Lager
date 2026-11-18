@@ -67,3 +67,21 @@ a.btn{text-decoration:none}
 
 .btn.scan{min-height:68px;font-size:26px;letter-spacing:.06em;background:var(--blue);border-color:var(--blue);color:#fff;margin-top:0;margin-bottom:8px}
 .btn.scan.armed{background:var(--yellow);border-color:var(--ink);color:var(--ink);font-size:19px;letter-spacing:0}
+
+/* ---- kompaktere Oberfläche (v2.2) ---- */
+body.typing #actions{position:static}
+::placeholder{font-size:12px}
+#expect{font-size:15px;padding:8px 12px;border-width:2px;line-height:1.2}
+#msg{padding:6px 10px;font-size:14px}
+#tabs{margin:8px 0}
+#tabs button{min-height:28px;padding:0 2px}
+#prod .name{font-size:20px}
+#prod .meta{font-size:13px}
+#prod .q{font-size:20px;margin-top:6px}
+#prod .q small{font-size:13px}
+#v-erfassen .card .btn{min-height:32px;font-size:13px;margin-top:6px;border-radius:9px}
+#v-erfassen .card input{min-height:34px;font-size:16px;margin-top:6px;border-radius:9px;padding:0 10px}
+#v-erfassen .card .row{gap:6px}
+.row.big .btn{min-height:64px}
+.btn.scan{min-height:58px}
+.row.three .btn{min-height:34px;font-size:12px;border-radius:9px}
