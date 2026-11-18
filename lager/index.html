@@ -25,13 +25,14 @@
     <section id="v-erfassen">
       <div class="card" id="prod"></div>
       <div class="card">
-        <div id="camWrap" hidden><video id="cam" playsinline muted></video><div class="reticle"></div></div>
+        <div id="camWrap" hidden><video id="cam" playsinline muted></video><div class="reticle"></div><div class="camhint">Nur Codes im Rahmen werden gelesen</div></div>
         <button class="btn" id="btnCam">Kamera-Scanner starten</button>
         <div class="row"><input id="inQty" type="number" inputmode="numeric" min="1" step="1" placeholder="Menge (z. B. 47)"><button class="btn" id="btnQty">Menge +</button></div>
         <div class="row"><input id="inCode" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Barcode eingeben"><button class="btn" id="btnCode">OK</button></div>
         <button class="btn" id="btnSearch">Produkt suchen / auswählen</button>
       </div>
       <div id="actions">
+        <button class="btn scan" id="btnScan">SCAN</button>
         <div class="row big"><button class="btn ok" id="btnConfirm">Bestätigen</button><button class="btn bad" id="btnCancel">Abbruch</button></div>
         <div class="row three"><button class="btn" id="btnStart">Erfass. Start</button><button class="btn" id="btnPause">Unterbrechen</button><button class="btn" id="btnFinish">Abschließen</button></div>
       </div>
