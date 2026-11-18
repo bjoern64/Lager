@@ -229,7 +229,7 @@ async function renderMore() {
     <button class="btn ok" id="mBackup">Sicherung erstellen</button>
     <label class="btn filebtn">Sicherung wiederherstellen<input type="file" id="mRestore" accept=".json,application/json"></label>
     <p class="hint">Dauerhafter Speicher: ${persisted === null ? "unbekannt" : persisted ? "zugesichert" : "nicht zugesichert (Sicherung wichtig)"}</p></div>
-  <div class="card"><h3>Info</h3><p class="hint">Installation: Safari → Teilen → „Zum Home-Bildschirm“. Scanner-Bibliothek: ${window.ZXing ? "geladen" : "FEHLT"}. Version 2.1</p></div>`;
+  <div class="card"><h3>Info</h3><p class="hint">Installation: Safari → Teilen → „Zum Home-Bildschirm“. Scanner-Bibliothek: ${window.ZXing ? "geladen" : "FEHLT"}. Version 2.2</p></div>`;
 }
 async function makeBackup() {
   try { const d = await db.exportAll(), ok = await deliver(new Blob([JSON.stringify(d)], { type: MIME.json }), `Lager_Sicherung_${stamp(new Date().toISOString())}.json`);
@@ -250,11 +250,14 @@ async function restore(file) {
 /* ---------- Start ---------- */
 async function main() {
   $("#tabs").innerHTML = TABS.map((t) => `<button>${t}</button>`).join("");
-  $("#tabs").onclick = (e) => e.target.tagName === "BUTTON" && setTab(e.target.textContent);
+  $("#tabs").onclick = (e) => { if (e.target.tagName === "BUTTON") setTab(e.target.textContent); };
   document.addEventListener("pointerdown", unlock, { passive: true });
+  // Beim Tippen darf die feste Tastenleiste das Eingabefeld nicht verdecken (sonst sieht man die Zahl nicht).
+  document.addEventListener("focusin", (e) => { if (e.target.matches("input")) { document.body.classList.add("typing"); setTimeout(() => e.target.scrollIntoView({ block: "center" }), 350); } });
+  document.addEventListener("focusout", () => document.body.classList.remove("typing"));
   const r = $(".reticle").style; r.left = ROI.x * 100 + "%"; r.top = ROI.y * 100 + "%"; r.width = ROI.w * 100 + "%"; r.height = ROI.h * 100 + "%";
   $("#btnScan").onclick = async () => { unlock(); if (!scanner || !scanner.running) await startCam(); if (scanner && scanner.running) scanner.arm(); };
-  $("#btnCam").onclick = () => (scanner && scanner.running ? stopCam() : startCam());
+  $("#btnCam").onclick = () => { if (scanner && scanner.running) stopCam(); else startCam(); };
   $("#btnConfirm").onclick = () => act(() => eng.confirm());
   $("#btnCancel").onclick = () => act(() => eng.cancel());
   $("#btnStart").onclick = () => act(() => eng.start());
@@ -262,14 +265,14 @@ async function main() {
   $("#btnFinish").onclick = () => act(() => eng.requestFinish());
   $("#btnQty").onclick = () => { const v = $("#inQty").value.trim(), n = Number(v); $("#inQty").value = ""; act(() => (/^\d+$/.test(v) && n >= 1 ? eng.addQty(n) : { ok: false, sound: "error", msg: "Bitte eine ganze Zahl ab 1 eingeben." })); };
   $("#btnCode").onclick = () => { const v = $("#inCode").value; $("#inCode").value = ""; act(() => eng.handleCode(v)); };
-  $("#inCode").onkeydown = (e) => e.key === "Enter" && $("#btnCode").click();
-  $("#inQty").onkeydown = (e) => e.key === "Enter" && $("#btnQty").click();
+  $("#inCode").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#btnCode").click(); });
+  $("#inQty").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#btnQty").click(); });
   $("#btnSearch").onclick = async () => { const p = await pickProduct(); if (p) act(() => eng.selectProduct(p)); };
   $("#pSearch").oninput = renderProducts; $("#pNew").onclick = () => productForm({ isNew: true });
   $("#pList").onclick = (e) => { const b = e.target.closest("[data-bc]"); if (b) productForm({ barcode: b.dataset.bc, isNew: false }); };
   $("#bSel").onchange = (e) => { bSel = +e.target.value; renderBestand(); }; $("#bSearch").oninput = renderBestand;
   $("#fileImp").onchange = (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) onImportFile(f); };
-  $("#impOut").onclick = (e) => e.target.id === "impGo" && doImport();
+  $("#impOut").onclick = (e) => { if (e.target.id === "impGo") doImport(); };
   $("#eList").onclick = (e) => { const b = e.target.closest("[data-x]"); if (b) exportErfassung(+b.dataset.x); };
   $("#v-mehr").onclick = async (e) => {
     const id = e.target.id;
