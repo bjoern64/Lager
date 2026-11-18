@@ -1,6 +1,6 @@
 import { IdbDb } from "./db.js";
 import { Engine } from "./engine.js";
-import { Scanner } from "./scanner.js";
+import { Scanner, ROI } from "./scanner.js";
 import { prefs, savePrefs, unlock, sound } from "./audio.js";
 import { buildXlsx, readXlsx } from "./xlsx.js";
 import { buildCommandSheet } from "./pdf.js";
@@ -104,7 +104,8 @@ function setTab(t) {
 async function startCam() {
   unlock();
   try {
-    scanner = scanner || new Scanner($("#cam"), (code) => { if ($("#modal").hidden) act(() => eng.handleCode(code)); });
+    scanner = scanner || new Scanner($("#cam"), (code) => { if ($("#modal").hidden) act(() => eng.handleCode(code)); },
+      () => feedback({ ok: false, sound: "error", msg: "Kein Code im Scanfenster erkannt. Bitte „SCAN“ erneut drücken." }), setArmed);
     await scanner.start(); $("#camWrap").hidden = false; $("#btnCam").textContent = "Kamera-Scanner stoppen";
     try { wake = await navigator.wakeLock?.request("screen"); } catch {}
   } catch (e) {
@@ -114,10 +115,14 @@ async function startCam() {
     stopCam(); feedback({ ok: false, sound: "error", msg: t || "Kamera konnte nicht gestartet werden: " + (e.message || e.name) });
   }
 }
+function setArmed(on) {
+  const b = $("#btnScan"); b.classList.toggle("armed", on); b.textContent = on ? "Suche Code … im Rahmen halten" : "SCAN";
+  $("#camWrap").classList.toggle("armed", on);
+}
 function stopCam() {
   if (scanner) scanner.stop();
   try { wake && wake.release(); } catch {} wake = null;
-  $("#camWrap").hidden = true; $("#btnCam").textContent = "Kamera-Scanner starten";
+  $("#camWrap").hidden = true; $("#btnCam").textContent = "Kamera-Scanner starten"; setArmed(false);
 }
 document.addEventListener("visibilitychange", () => { if (document.hidden) stopCam(); });
 
@@ -224,7 +229,7 @@ async function renderMore() {
     <button class="btn ok" id="mBackup">Sicherung erstellen</button>
     <label class="btn filebtn">Sicherung wiederherstellen<input type="file" id="mRestore" accept=".json,application/json"></label>
     <p class="hint">Dauerhafter Speicher: ${persisted === null ? "unbekannt" : persisted ? "zugesichert" : "nicht zugesichert (Sicherung wichtig)"}</p></div>
-  <div class="card"><h3>Info</h3><p class="hint">Installation: Safari → Teilen → „Zum Home-Bildschirm“. Scanner-Bibliothek: ${window.ZXing ? "geladen" : "FEHLT"}. Version 2.0</p></div>`;
+  <div class="card"><h3>Info</h3><p class="hint">Installation: Safari → Teilen → „Zum Home-Bildschirm“. Scanner-Bibliothek: ${window.ZXing ? "geladen" : "FEHLT"}. Version 2.1</p></div>`;
 }
 async function makeBackup() {
   try { const d = await db.exportAll(), ok = await deliver(new Blob([JSON.stringify(d)], { type: MIME.json }), `Lager_Sicherung_${stamp(new Date().toISOString())}.json`);
@@ -247,6 +252,8 @@ async function main() {
   $("#tabs").innerHTML = TABS.map((t) => `<button>${t}</button>`).join("");
   $("#tabs").onclick = (e) => e.target.tagName === "BUTTON" && setTab(e.target.textContent);
   document.addEventListener("pointerdown", unlock, { passive: true });
+  const r = $(".reticle").style; r.left = ROI.x * 100 + "%"; r.top = ROI.y * 100 + "%"; r.width = ROI.w * 100 + "%"; r.height = ROI.h * 100 + "%";
+  $("#btnScan").onclick = async () => { unlock(); if (!scanner || !scanner.running) await startCam(); if (scanner && scanner.running) scanner.arm(); };
   $("#btnCam").onclick = () => (scanner && scanner.running ? stopCam() : startCam());
   $("#btnConfirm").onclick = () => act(() => eng.confirm());
   $("#btnCancel").onclick = () => act(() => eng.cancel());
