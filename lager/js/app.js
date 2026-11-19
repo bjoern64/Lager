@@ -15,7 +15,8 @@ const label = (p) => p.name || p.barcode;
 const MIME = { xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", pdf: "application/pdf", json: "application/json" };
 
 const db = new IdbDb(), eng = new Engine(db);
-let scanner = null, wake = null, tab = "Erfassen", chain = Promise.resolve(), msgTimer = null;
+const scanners = {};
+let wake = null, tab = "Erfassen", chain = Promise.resolve(), msgTimer = null;
 
 /* ---------- Rückmeldung ---------- */
 function showMsg(text, kind, ms = 6000) {
@@ -25,7 +26,7 @@ function showMsg(text, kind, ms = 6000) {
 function feedback(r) {
   if (!r) return;
   sound(r.sound); showMsg(r.msg, r.ok ? "ok" : "err"); render();
-  if (r.unknown && $("#modal").hidden) productForm({ barcode: r.unknown, isNew: true, select: true });
+  if (r.unknown && $("#modal").hidden) productForm({ barcode: r.unknown, isNew: true, select: !r.quick, quick: !!r.quick });
   if (r.ask === "finish") askFinish();
   if (r.finished) afterFinish(r.finished);
 }
@@ -79,7 +80,8 @@ const UI = {
   finished: ["Erfassung abgeschlossen. Neue mit „Erfass. Start“.", "st-gray"],
 };
 function render() {
-  const e = eng.erf, [txt, cls] = UI[eng.state];
+  const e = eng.erf; let [txt, cls] = UI[eng.state];
+  if (tab === "Zählen" && eng.active) [txt, cls] = ["Artikel scannen: jeder Scan zählt +1", "st-blue"];
   $("#erfInfo").innerHTML = e ? `<b>Erfassung Nr. ${e.id}</b><span>${fmt(e.start)}</span><span class="badge ${e.status}">${e.status}</span>` : `<b>Keine Erfassung</b>`;
   const x = $("#expect"); x.textContent = txt; x.className = cls;
   const p = eng.product;
@@ -87,26 +89,39 @@ function render() {
     ? `<div class="name">${esc(label(p))}</div><div class="meta">Barcode ${esc(p.barcode)}</div><div class="meta">Kategorie: ${esc(p.kategorie || "–")} · Variante: ${esc(p.variante || "–")}</div>
        <div class="q">Vorläufig: ${eng.qty}<small>${eng.parts.length ? esc(eng.parts.join(" + ")) : "noch keine Menge"}</small></div>`
     : `<div class="none">Kein Produkt ausgewählt</div>`;
-  $("#btnStart").textContent = eng.state === "paused" ? "Fortsetzen" : "Erfass. Start";
-  $("#recent").innerHTML = eng.recent.length ? eng.recent.map((r) => `<li><b>${esc(r.name)}</b>: ${r.menge} <small>${pad(new Date(r.zeit).getHours())}:${pad(new Date(r.zeit).getMinutes())}</small></li>`).join("") : `<li class="hint" style="list-style:none;margin-left:-22px">Noch keine bestätigten Buchungen.</li>`;
+  const st = eng.state === "paused" ? "Fortsetzen" : "Erfass. Start"; $("#btnStart").textContent = st; $("#btnStartZ").textContent = st;
+  const li = (r, plus) => `<li><b>${esc(r.name)}</b>: ${plus && r.menge > 0 ? "+" : ""}${r.menge} <small>${pad(new Date(r.zeit).getHours())}:${pad(new Date(r.zeit).getMinutes())}</small></li>`;
+  const none = `<li class="hint" style="list-style:none;margin-left:-22px">Noch keine Buchungen.</li>`;
+  $("#recent").innerHTML = eng.recent.length ? eng.recent.map((r) => li(r, false)).join("") : none;
+  $("#recentZ").innerHTML = eng.recent.length ? eng.recent.map((r) => li(r, true)).join("") : none;
+  if (tab === "Zählen") updateQuick();
 }
-const TABS = ["Erfassen", "Produkte", "Bestand", "Import", "Export", "Mehr"];
+async function updateQuick() {
+  const box = $("#qInfo"), p = eng.lastQuick;
+  if (!eng.erf) { box.innerHTML = `<div class="none">Keine Erfassung. „Erfass. Start“ drücken.</div>`; return; }
+  const b = await db.getBestand(eng.erf.id), sum = b.reduce((a, x) => a + x.gesamt, 0), one = p && b.find((x) => x.barcode === p.barcode);
+  box.innerHTML = (p ? `<div class="name">Zuletzt: ${esc(label(p))}</div><div class="meta">${esc(p.barcode)} · ${esc(p.kategorie || "–")} · ${esc(p.variante || "–")}</div>` : `<div class="none">Noch nichts gezählt</div>`)
+    + `<div class="q">${one ? "Summe Artikel: " + one.gesamt + " · " : ""}Gesamt: ${sum}<small>Stück</small></div>`;
+}
+const TABS = ["Erfassen", "Zählen", "Produkte", "Bestand", "Import", "Export", "Mehr"];
+const vid = (n) => "#v-" + (n === "Zählen" ? "zaehlen" : n.toLowerCase());
 function setTab(t) {
-  if (t !== "Erfassen") stopCam();
+  stopCam();
   tab = t;
-  TABS.forEach((n) => ($("#v-" + n.toLowerCase()).hidden = n !== t));
+  TABS.forEach((n) => ($(vid(n)).hidden = n !== t));
   $("#tabs").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.textContent === t));
   ({ Produkte: renderProducts, Bestand: renderBestand, Export: renderExport, Mehr: renderMore }[t] || (() => {}))();
-  window.scrollTo(0, 0);
+  render(); window.scrollTo(0, 0);
 }
 
 /* ---------- Kamera ---------- */
-async function startCam() {
+const camKey = () => (tab === "Zählen" ? "Z" : "");
+async function startCam(k = camKey()) {
   unlock();
   try {
-    scanner = scanner || new Scanner($("#cam"), (code) => { if ($("#modal").hidden) act(() => eng.handleCode(code)); },
-      () => feedback({ ok: false, sound: "error", msg: "Kein Code im Scanfenster erkannt. Bitte „SCAN“ erneut drücken." }), setArmed);
-    await scanner.start(); $("#camWrap").hidden = false; $("#btnCam").textContent = "Kamera-Scanner stoppen";
+    scanners[k] = scanners[k] || new Scanner($("#cam" + k), (code) => { if ($("#modal").hidden) act(() => (k === "Z" ? eng.quickCount(code) : eng.handleCode(code))); },
+      () => feedback({ ok: false, sound: "error", msg: "Kein Code im Scanfenster erkannt. Bitte „SCAN“ erneut drücken." }), (on) => setArmed(on, k));
+    await scanners[k].start(); $("#camWrap" + k).hidden = false; $("#btnCam" + k).textContent = "Kamera-Scanner stoppen";
     try { wake = await navigator.wakeLock?.request("screen"); } catch {}
   } catch (e) {
     const t = { NotAllowedError: "Kamerazugriff verweigert. iPhone: Einstellungen → Safari → Kamera → „Erlauben“ (bei installierter App ggf. erneut bestätigen).",
@@ -115,14 +130,13 @@ async function startCam() {
     stopCam(); feedback({ ok: false, sound: "error", msg: t || "Kamera konnte nicht gestartet werden: " + (e.message || e.name) });
   }
 }
-function setArmed(on) {
-  const b = $("#btnScan"); b.classList.toggle("armed", on); b.textContent = on ? "Suche Code … im Rahmen halten" : "SCAN";
-  $("#camWrap").classList.toggle("armed", on);
+function setArmed(on, k = "") {
+  const b = $("#btnScan" + k); b.classList.toggle("armed", on); b.textContent = on ? "Suche Code … im Rahmen halten" : "SCAN";
+  $("#camWrap" + k).classList.toggle("armed", on);
 }
 function stopCam() {
-  if (scanner) scanner.stop();
+  for (const k of ["", "Z"]) { if (scanners[k]) scanners[k].stop(); $("#camWrap" + k).hidden = true; $("#btnCam" + k).textContent = "Kamera-Scanner starten"; setArmed(false, k); }
   try { wake && wake.release(); } catch {} wake = null;
-  $("#camWrap").hidden = true; $("#btnCam").textContent = "Kamera-Scanner starten"; setArmed(false);
 }
 document.addEventListener("visibilitychange", () => { if (document.hidden) stopCam(); });
 
@@ -133,7 +147,7 @@ async function renderProducts() {
   const q = $("#pSearch").value.trim().toLowerCase(), all = (await db.getAllProducts()).filter((p) => matches(p, q)).sort((a, b) => label(a).localeCompare(label(b), "de"));
   $("#pList").innerHTML = (all.slice(0, 200).map((p) => itemHtml(p)).join("") || `<div class="card hint">Keine Produkte. Über „Import“ oder „Neu“ anlegen.</div>`) + (all.length > 200 ? `<div class="hint">${all.length} Treffer – erste 200 angezeigt, bitte Suche verfeinern.</div>` : "");
 }
-function productForm({ barcode = "", isNew = true, select = false }) {
+function productForm({ barcode = "", isNew = true, select = false, quick = false }) {
   return (async () => {
     const old = isNew ? null : await db.getProduct(barcode), lock = !isNew || !!barcode;
     const body = `<label>Barcode<input id="f_bc" value="${esc(barcode)}" ${lock ? "readonly" : ""} autocapitalize="off"></label>
@@ -150,7 +164,7 @@ function productForm({ barcode = "", isNew = true, select = false }) {
     if (isNew && (await db.getProduct(prod.barcode))) return feedback({ ok: false, sound: "error", msg: `Barcode ${prod.barcode} existiert bereits.` });
     try { await db.putProduct(prod); } catch (e) { return feedback({ ok: false, sound: "error", msg: "Speicherfehler: Produkt nicht gespeichert. " + e.message }); }
     eng.names.delete(prod.barcode); await eng.refreshRecent();
-    if (select) act(() => eng.selectProduct(prod)); else showMsg("Produkt gespeichert.", "ok");
+    if (select) act(() => eng.selectProduct(prod)); else if (quick) act(() => eng.quickBook(prod)); else showMsg("Produkt gespeichert.", "ok");
     if (tab === "Produkte") renderProducts();
   })();
 }
@@ -229,7 +243,7 @@ async function renderMore() {
     <button class="btn ok" id="mBackup">Sicherung erstellen</button>
     <label class="btn filebtn">Sicherung wiederherstellen<input type="file" id="mRestore" accept=".json,application/json"></label>
     <p class="hint">Dauerhafter Speicher: ${persisted === null ? "unbekannt" : persisted ? "zugesichert" : "nicht zugesichert (Sicherung wichtig)"}</p></div>
-  <div class="card"><h3>Info</h3><p class="hint">Installation: Safari → Teilen → „Zum Home-Bildschirm“. Scanner-Bibliothek: ${window.ZXing ? "geladen" : "FEHLT"}. Version 2.2</p></div>`;
+  <div class="card"><h3>Info</h3><p class="hint">Installation: Safari → Teilen → „Zum Home-Bildschirm“. Scanner-Bibliothek: ${window.ZXing ? "geladen" : "FEHLT"}. Version 2.3</p></div>`;
 }
 async function makeBackup() {
   try { const d = await db.exportAll(), ok = await deliver(new Blob([JSON.stringify(d)], { type: MIME.json }), `Lager_Sicherung_${stamp(new Date().toISOString())}.json`);
@@ -255,9 +269,16 @@ async function main() {
   // Beim Tippen darf die feste Tastenleiste das Eingabefeld nicht verdecken (sonst sieht man die Zahl nicht).
   document.addEventListener("focusin", (e) => { if (e.target.matches("input")) { document.body.classList.add("typing"); setTimeout(() => e.target.scrollIntoView({ block: "center" }), 350); } });
   document.addEventListener("focusout", () => document.body.classList.remove("typing"));
-  const r = $(".reticle").style; r.left = ROI.x * 100 + "%"; r.top = ROI.y * 100 + "%"; r.width = ROI.w * 100 + "%"; r.height = ROI.h * 100 + "%";
-  $("#btnScan").onclick = async () => { unlock(); if (!scanner || !scanner.running) await startCam(); if (scanner && scanner.running) scanner.arm(); };
-  $("#btnCam").onclick = () => { if (scanner && scanner.running) stopCam(); else startCam(); };
+  document.querySelectorAll(".reticle").forEach((el) => { const r = el.style; r.left = ROI.x * 100 + "%"; r.top = ROI.y * 100 + "%"; r.width = ROI.w * 100 + "%"; r.height = ROI.h * 100 + "%"; });
+  for (const k of ["", "Z"]) {
+    $("#btnScan" + k).onclick = async () => { unlock(); if (!scanners[k] || !scanners[k].running) await startCam(k); if (scanners[k] && scanners[k].running) scanners[k].arm(); };
+    $("#btnCam" + k).onclick = () => { if (scanners[k] && scanners[k].running) stopCam(); else startCam(k); };
+  }
+  $("#btnStartZ").onclick = () => act(() => eng.start()); $("#btnPauseZ").onclick = () => act(() => eng.pause()); $("#btnFinishZ").onclick = () => act(() => eng.requestFinish());
+  $("#btnUndo").onclick = () => act(() => eng.undoQuick());
+  $("#btnCodeZ").onclick = () => { const v = $("#inCodeZ").value; $("#inCodeZ").value = ""; act(() => eng.quickCount(v)); };
+  $("#inCodeZ").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#btnCodeZ").click(); });
+  $("#btnSearchZ").onclick = async () => { const p = await pickProduct(); if (p) act(() => eng.quickBook(p)); };
   $("#btnConfirm").onclick = () => act(() => eng.confirm());
   $("#btnCancel").onclick = () => act(() => eng.cancel());
   $("#btnStart").onclick = () => act(() => eng.start());

@@ -92,6 +92,36 @@ export class Engine {
     await this.savePending(); await this.refreshRecent();
     return R(true, `Gebucht: ${qty} × ${label(product)} (Summe ${total})`, "confirm");
   }
+  /** Schnellzählung: jeder gescannte Artikel wird sofort mit +1 gebucht (kein Bestätigen). */
+  async quickCount(raw) {
+    const code = String(raw ?? "").trim();
+    if (!code) return R(false, "Leerer Code.");
+    if (!this.active) return R(false, this.inactiveMsg());
+    if (code.startsWith("INVENTORY_")) return R(false, "Befehlscodes gelten nur im Reiter „Erfassen“. Hier bitte nur Artikel scannen.");
+    const p = await this.lookup(code);
+    if (!p) return R(false, `Unbekannter Barcode ${code} – Produkt bitte anlegen.`, "error", { unknown: code, quick: true });
+    return this.quickBook(p);
+  }
+  async quickBook(p) {
+    if (!this.active) return R(false, this.inactiveMsg());
+    let total;
+    try { total = await this.db.book(this.erf.id, p.barcode, 1); }
+    catch (e) { return R(false, "Speicherfehler – NICHT gezählt. " + (e.message === "NOT_ACTIVE" ? "Erfassung ist nicht aktiv." : e.message || "")); }
+    this.lastQuick = p; this.names.set(p.barcode, p);
+    await this.refreshRecent();
+    return R(true, `+1 ${label(p)} (Summe ${total})`, "scan", { total });
+  }
+  /** Nimmt die letzte Schnellzählung als Gegenbuchung (−1) zurück; das Protokoll bleibt vollständig. */
+  async undoQuick() {
+    if (!this.active) return R(false, this.inactiveMsg());
+    const p = this.lastQuick; if (!p) return R(false, "Nichts zum Zurücknehmen.");
+    const b = (await this.db.getBestand(this.erf.id)).find((x) => x.barcode === p.barcode);
+    if (!b || b.gesamt < 1) return R(false, "Zurücknehmen nicht möglich: Bestand dieses Artikels ist 0.");
+    let total;
+    try { total = await this.db.book(this.erf.id, p.barcode, -1); } catch (e) { return R(false, "Speicherfehler – nichts geändert. " + (e.message || "")); }
+    this.lastQuick = null; await this.refreshRecent();
+    return R(true, `Zurückgenommen: −1 ${label(p)} (Summe ${total})`, "cancel", { total });
+  }
   async cancel() {
     if (!this.active) return R(false, this.inactiveMsg());
     if (this.qty > 0) { const q = this.qty; this.qty = 0; this.parts = []; await this.savePending(); return R(true, `Abgebrochen: ${q} Stück verworfen (nichts gebucht).`, "cancel"); }
