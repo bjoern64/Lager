@@ -1,5 +1,5 @@
 // Service Worker: legt alle Programmdateien (inkl. Scanner-Bibliothek) im Cache ab → Offline-Betrieb.
-const V = "lager-v6";
+const V = "lager-v7";
 const CORE = ["./", "index.html", "style.css", "manifest.webmanifest", "js/app.js", "js/engine.js", "js/db.js", "js/products.js",
   "js/xlsx.js", "js/pdf.js", "js/code128.js", "js/scanner.js", "js/audio.js", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png"];
 self.addEventListener("install", (e) => {
