@@ -20,8 +20,8 @@ let wake = null, tab = "Erfassen", chain = Promise.resolve(), msgTimer = null;
 
 /* ---------- Rückmeldung ---------- */
 function showMsg(text, kind, ms = 6000) {
-  const m = $("#msg"); m.textContent = text; m.className = kind; m.hidden = !text;
-  clearTimeout(msgTimer); if (text && ms) msgTimer = setTimeout(() => (m.hidden = true), ms);
+  const m = $("#msg"); m.textContent = text || ""; m.className = text ? kind : "empty";
+  clearTimeout(msgTimer); if (text && ms) msgTimer = setTimeout(() => { m.textContent = ""; m.className = "empty"; }, ms);
 }
 function feedback(r) {
   if (!r) return;
@@ -101,7 +101,7 @@ async function updateQuick() {
   if (!eng.erf) { box.innerHTML = `<div class="none">Keine Erfassung. „Erfass. Start“ drücken.</div>`; return; }
   const b = await db.getBestand(eng.erf.id), sum = b.reduce((a, x) => a + x.gesamt, 0), one = p && b.find((x) => x.barcode === p.barcode);
   box.innerHTML = (p ? `<div class="name">Zuletzt: ${esc(label(p))}</div><div class="meta">${esc(p.barcode)} · ${esc(p.kategorie || "–")} · ${esc(p.variante || "–")}</div>` : `<div class="none">Noch nichts gezählt</div>`)
-    + `<div class="q">${one ? "Summe Artikel: " + one.gesamt + " · " : ""}Gesamt: ${sum}<small>Stück</small></div>`;
+    + `<div class="q">${one ? "Summe Artikel: " + one.gesamt + " · " : ""}Gesamt: ${sum}</div>`;
 }
 const TABS = ["Erfassen", "Zählen", "Produkte", "Bestand", "Import", "Export", "Mehr"];
 const vid = (n) => "#v-" + (n === "Zählen" ? "zaehlen" : n.toLowerCase());
@@ -243,7 +243,7 @@ async function renderMore() {
     <button class="btn ok" id="mBackup">Sicherung erstellen</button>
     <label class="btn filebtn">Sicherung wiederherstellen<input type="file" id="mRestore" accept=".json,application/json"></label>
     <p class="hint">Dauerhafter Speicher: ${persisted === null ? "unbekannt" : persisted ? "zugesichert" : "nicht zugesichert (Sicherung wichtig)"}</p></div>
-  <div class="card"><h3>Info</h3><p class="hint">Installation: Safari → Teilen → „Zum Home-Bildschirm“. Scanner-Bibliothek: ${window.ZXing ? "geladen" : "FEHLT"}. Version 2.3</p></div>`;
+  <div class="card"><h3>Info</h3><p class="hint">Installation: Safari → Teilen → „Zum Home-Bildschirm“. Scanner-Bibliothek: ${window.ZXing ? "geladen" : "FEHLT"}. Version 2.4</p></div>`;
 }
 async function makeBackup() {
   try { const d = await db.exportAll(), ok = await deliver(new Blob([JSON.stringify(d)], { type: MIME.json }), `Lager_Sicherung_${stamp(new Date().toISOString())}.json`);
