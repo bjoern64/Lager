@@ -39,6 +39,22 @@
       <div class="card"><h3>Letzte 3 bestätigte Positionen</h3><ol id="recent"></ol></div>
     </section>
 
+    <section id="v-zaehlen" hidden>
+      <div class="card" id="qInfo"></div>
+      <div class="card">
+        <div id="camWrapZ" hidden><video id="camZ" playsinline muted></video><div class="reticle"></div><div class="camhint">Nur Codes im Rahmen werden gelesen</div></div>
+        <button class="btn" id="btnCamZ">Kamera-Scanner starten</button>
+        <div class="row"><input id="inCodeZ" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Barcode eingeben"><button class="btn" id="btnCodeZ">+1</button></div>
+        <button class="btn" id="btnSearchZ">Produkt suchen (+1)</button>
+      </div>
+      <div id="actionsZ">
+        <button class="btn scan" id="btnScanZ">SCAN</button>
+        <button class="btn" id="btnUndo">Letzte Zählung zurücknehmen</button>
+        <div class="row three"><button class="btn" id="btnStartZ">Erfass. Start</button><button class="btn" id="btnPauseZ">Unterbrechen</button><button class="btn" id="btnFinishZ">Abschließen</button></div>
+      </div>
+      <div class="card"><h3>Letzte 3 Zählungen</h3><ol id="recentZ"></ol></div>
+    </section>
+
     <section id="v-produkte" hidden>
       <div class="card"><div class="row"><input id="pSearch" type="search" placeholder="Suchen: Name, Barcode, Kategorie, Variante"><button class="btn" id="pNew">Neu</button></div></div>
       <div class="list" id="pList"></div>
