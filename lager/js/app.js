@@ -1,5 +1,5 @@
 import { IdbDb } from "./db.js";
-import { Engine } from "./engine.js";
+import { Engine, QTYS } from "./engine.js";
 import { Scanner, ROI } from "./scanner.js";
 import { prefs, savePrefs, unlock, sound } from "./audio.js";
 import { buildXlsx, readXlsx } from "./xlsx.js";
@@ -243,7 +243,7 @@ async function renderMore() {
     <button class="btn ok" id="mBackup">Sicherung erstellen</button>
     <label class="btn filebtn">Sicherung wiederherstellen<input type="file" id="mRestore" accept=".json,application/json"></label>
     <p class="hint">Dauerhafter Speicher: ${persisted === null ? "unbekannt" : persisted ? "zugesichert" : "nicht zugesichert (Sicherung wichtig)"}</p></div>
-  <div class="card"><h3>Info</h3><p class="hint">Installation: Safari → Teilen → „Zum Home-Bildschirm“. Scanner-Bibliothek: ${window.ZXing ? "geladen" : "FEHLT"}. Version 2.4</p></div>`;
+  <div class="card"><h3>Info</h3><p class="hint">Installation: Safari → Teilen → „Zum Home-Bildschirm“. Scanner-Bibliothek: ${window.ZXing ? "geladen" : "FEHLT"}. Version 2.5</p></div>`;
 }
 async function makeBackup() {
   try { const d = await db.exportAll(), ok = await deliver(new Blob([JSON.stringify(d)], { type: MIME.json }), `Lager_Sicherung_${stamp(new Date().toISOString())}.json`);
@@ -266,9 +266,12 @@ async function main() {
   $("#tabs").innerHTML = TABS.map((t) => `<button>${t}</button>`).join("");
   $("#tabs").onclick = (e) => { if (e.target.tagName === "BUTTON") setTab(e.target.textContent); };
   document.addEventListener("pointerdown", unlock, { passive: true });
+  // Mengen-Tastenfeld (fest unten, über SCAN): wirkt wie ein gescannter Mengenbefehl
+  $("#qtyPad").innerHTML = QTYS.map((q) => `<button class="btn" data-q="${q}">${q}</button>`).join("");
+  $("#qtyPad").onclick = (e) => { const b = e.target.closest("button[data-q]"); if (b) { unlock(); act(() => eng.addQty(+b.dataset.q)); } };
   // Beim Tippen darf die feste Tastenleiste das Eingabefeld nicht verdecken (sonst sieht man die Zahl nicht).
-  document.addEventListener("focusin", (e) => { if (e.target.matches("input")) { document.body.classList.add("typing"); setTimeout(() => e.target.scrollIntoView({ block: "center" }), 350); } });
-  document.addEventListener("focusout", () => document.body.classList.remove("typing"));
+  document.addEventListener("focusin", (e) => { if (e.target.matches("input")) { document.body.classList.add("typing"); setTimeout(() => e.target.scrollIntoView({ block: "nearest" }), 350); } });
+  document.addEventListener("focusout", () => setTimeout(() => { if (!document.activeElement || !document.activeElement.matches("input")) document.body.classList.remove("typing"); }, 400));
   document.querySelectorAll(".reticle").forEach((el) => { const r = el.style; r.left = ROI.x * 100 + "%"; r.top = ROI.y * 100 + "%"; r.width = ROI.w * 100 + "%"; r.height = ROI.h * 100 + "%"; });
   for (const k of ["", "Z"]) {
     $("#btnScan" + k).onclick = async () => { unlock(); if (!scanners[k] || !scanners[k].running) await startCam(k); if (scanners[k] && scanners[k].running) scanners[k].arm(); };
